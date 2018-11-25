@@ -1,0 +1,27 @@
+{
+  "data": {
+    "aps": {
+      "alert": {
+        "body": "收到了短信",
+        "subtitle": "子标题",
+        "title": "标题"
+      },
+      "badge": "Increment",
+      "sms": {
+        "address": "+8615313726078",
+        "body": "这是一条测试短信",
+        "date": "1543116186183",
+        "id": "1",
+        "phoneId": "0",
+        "protocol": "0",
+        "read": "0",
+        "type": "1"
+      },
+      "sound": "default"
+    }
+  },
+  "prod": "dev",
+  "where": {
+    "deviceType": "ios"
+  }
+}
