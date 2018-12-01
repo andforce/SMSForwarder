@@ -26,25 +26,24 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-public class SmsReceiver extends BroadcastReceiver {
+public class SMSBroadcastReceiver extends BroadcastReceiver {
 
     public static final String SMS_RECEIVED = "android.provider.Telephony.SMS_RECEIVED";
 
     private static final String TAG = "SMSForwarder";
 
-    public SmsReceiver() {
-        Log.i(TAG, "new SmsReceiver");
+    public SMSBroadcastReceiver() {
+        Log.i(TAG, "new SMSBroadcastReceiver");
     }
 
     @Override
     public void onReceive(final Context context, Intent intent) {
-        Log.i(TAG, "jie shou dao");
+        Log.d(TAG, "sms received!");
 
         if (!SMS_RECEIVED.equals(intent.getAction())) {
             return;
         }
 
-        Log.d(TAG, "sms received!");
         Bundle bundle = intent.getExtras();
         if (bundle == null) {
             return;
@@ -69,6 +68,10 @@ public class SmsReceiver extends BroadcastReceiver {
 
 
         Object[] pdus = (Object[]) bundle.get("pdus");
+        if (pdus == null || pdus.length == 0){
+            return;
+        }
+
         final SmsMessage[] messages = new SmsMessage[pdus.length];
 
         final List<ContentValues> contentValuesList = new ArrayList<>();

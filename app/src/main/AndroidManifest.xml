@@ -29,7 +29,7 @@
 
         <service android:name=".ForwardService" />
 
-        <receiver android:name=".SmsReceiver" android:permission="android.permission.BROADCAST_SMS">
+        <receiver android:name=".SMSBroadcastReceiver" android:permission="android.permission.BROADCAST_SMS">
             <intent-filter android:priority="2147483647">
                 <action android:name="android.provider.Telephony.SMS_DELIVER" />
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />

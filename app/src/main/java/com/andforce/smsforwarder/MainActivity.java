@@ -12,10 +12,22 @@ import android.provider.Telephony;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.Toast;
 
+import com.google.gson.Gson;
+
+import java.io.IOException;
 import java.util.List;
+
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -26,6 +38,50 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        Button button = findViewById(R.id.send_button);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                Log.d(TAG, "Start Push");
+                final String messageJson = "{\"data\":{\"aps\":{\"alert\":{\"body\":\"888888\",\"title\":\"+8615313726078\"}," +
+                        "\"badge\":\"Increment\",\"sms\":{\"address\":\"+8615313726078\",\"body\":\"888888\",\"date\":\"1543672750000\",\"id\":\"1064\",\"person\":\"\",\"protocol\":\"0\",\"read\":\"0\",\"simId\":\"-1\",\"type\":\"1\"},\"sound\":\"default\"}},\"prod\":\"dev\",\"where\":{\"deviceType\":\"ios\"}}";
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        OkHttpClient client = new OkHttpClient();
+
+                        MediaType mediaType = MediaType.parse("application/json");
+                        RequestBody body = RequestBody.create(mediaType, messageJson);
+                        Request request = new Request.Builder()
+                                .url("https://6g0ounut.push.lncld.net/1.1/push")
+                                .post(body)
+                                .addHeader("content-type", "application/json")
+                                .addHeader("x-lc-id", "6G0ouNUTlUdRYE2ARgwAhiJM-gzGzoHsz")
+                                .addHeader("x-lc-key", "nGciHu1gAOH8A93ja2i9OOVY,wL3ha2OcwKHbBMYTULnhp9bY")
+                                .build();
+
+                        try {
+                            Response response = client.newCall(request).execute();
+                            if (response.body() != null) {
+                                String result = response.body().string();
+                                Log.d(TAG, "Push: " + result);
+                                if (!TextUtils.isEmpty(result)) {
+                                    if (result.contains("objectId")) {
+                                        // success
+                                    }
+                                }
+                            }
+
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }).start();
+
+            }
+        });
 
         mSMSContentObserver = new SMSContentObserver(mHandler, this.getApplicationContext());
 
