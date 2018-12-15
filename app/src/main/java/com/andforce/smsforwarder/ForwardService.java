@@ -11,6 +11,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ImageButton;
 
@@ -20,7 +21,7 @@ public class ForwardService extends Service {
     private static final String TAG = "MainService";
 
     //要引用的布局文件.
-    ConstraintLayout toucherLayout;
+    View toucherLayout;
     //布局参数.
     WindowManager.LayoutParams params;
     //实例化的WindowManager.
@@ -31,6 +32,8 @@ public class ForwardService extends Service {
     //状态栏高度.（接下来会用到）
     int statusBarHeight = -1;
 
+    float x = 0;
+    float y = 0;
     @Override
     public void onCreate() {
         super.onCreate();
@@ -62,12 +65,12 @@ public class ForwardService extends Service {
         //注意，这里的width和height均使用px而非dp.这里我偷了个懒
         //如果你想完全对应布局设置，需要先获取到机器的dpi
         //px与dp的换算为px = dp * (dpi / 160).
-        params.width = 300;
-        params.height = 300;
+        params.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+        params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
 
         LayoutInflater inflater = LayoutInflater.from(getApplication());
         //获取浮动窗口视图所在布局.
-        toucherLayout = (ConstraintLayout) inflater.inflate(R.layout.toucherlayout, null);
+        toucherLayout = inflater.inflate(R.layout.toucherlayout, null);
         //添加toucherlayout
         windowManager.addView(toucherLayout, params);
 
@@ -93,11 +96,42 @@ public class ForwardService extends Service {
         imageButton1.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
-                //ImageButton我放在了布局中心，布局一共300dp
-                params.x = (int) event.getRawX() - 150;
-                //这就是状态栏偏移量用的地方
-                params.y = (int) event.getRawY() - 150 - statusBarHeight;
-                windowManager.updateViewLayout(toucherLayout, params);
+
+
+                switch (event.getAction()){
+                    case MotionEvent.ACTION_DOWN :{
+                        x = event.getRawX();
+                        y = event.getRawY();
+                        Log.d("FLOAT_TOUCH", "DOWN X:" +x + " Y:" + y);
+                        break;
+                    }
+                    case MotionEvent.ACTION_MOVE :{
+                        float moveX = event.getRawX();
+                        float moveY = event.getRawY();
+
+                        Log.d("FLOAT_TOUCH", "MOVE X:" + moveX + " Y:" + moveY);
+                        if (Math.abs(x - moveX) < 10 && Math.abs(y - moveY) < 10){
+                            break;
+                        }
+                        params.x = (int) event.getRawX() - toucherLayout.getWidth() / 2;
+                        //这就是状态栏偏移量用的地方
+                        params.y = (int) event.getRawY() - toucherLayout.getHeight() / 2 - statusBarHeight;
+                        windowManager.updateViewLayout(toucherLayout, params);
+                        x = moveX;
+                        y = moveY;
+
+                        break;
+                    }
+
+                    case MotionEvent.ACTION_UP :{
+                        Log.d("FLOAT_TOUCH", "UP");
+                        x = 0;
+                        y = 0;
+                        break;
+                    }
+
+                }
+
                 return false;
             }
         });
