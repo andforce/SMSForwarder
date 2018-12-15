@@ -147,7 +147,6 @@ public class MainActivity extends AppCompatActivity {
             if (!defaultSmsReplaced()){
                 // 用户点了NO
                 showDialog();
-                isWantReplace = false;
             } else {
                 //用户点了 YES
                 // 短信应用已经被替换成 有消息，不需要监听数据库了
@@ -176,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+        isWantReplace = false;
     }
 
     @Override
