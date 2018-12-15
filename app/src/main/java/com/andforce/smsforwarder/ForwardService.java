@@ -20,7 +20,7 @@ public class ForwardService extends Service {
     public void onCreate() {
         super.onCreate();
         //获取浮动窗口视图所在布局.
-        mFloatView = (FloatView) LayoutInflater.from(getApplication()).inflate(R.layout.toucherlayout, null);
+        mFloatView = (FloatView) (LayoutInflater.from(getApplication()).inflate(R.layout.toucherlayout, null).findViewById(R.id.imageButton1));
         mFloatView.show(500, 500);
         mFloatView.setOnClickListener(new View.OnClickListener() {
             @Override
