@@ -1,5 +1,6 @@
 package com.andforce.smsforwarder;
 
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -11,115 +12,169 @@ import android.provider.Settings;
 import android.provider.Telephony;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
-import com.google.gson.Gson;
+import com.andforce.smsforwarder.test.TestSendPush;
+import com.andforce.smsforwarder.utils.Manufacturer;
 
-import java.io.IOException;
 import java.util.List;
-
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
 
     private static String TAG = "SMSForwarder";
     private SMSContentObserver mSMSContentObserver;
 
+    private boolean isWantReplace = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        if (defaultSmsReplaced()){
+            // 短信应用已经被替换成 有消息，不需要监听数据库了
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                //检查有没有悬浮框的权限
+                if (Settings.canDrawOverlays(MainActivity.this)) {
+                    //如果有权限直接开启悬浮框，目的是保活
+                    Toast.makeText(MainActivity.this, "已开启Toucher", Toast.LENGTH_SHORT).show();
+                    Intent intent = new Intent(MainActivity.this, ForwardService.class);
+                    startService(intent);
+
+                    List<String> failedPermissions = PermissionUtils.checkPermissions(this);
+                    if (!failedPermissions.isEmpty()){
+                        ActivityCompat.requestPermissions(this, PermissionUtils.sPermissions, 0x0001);
+                    }
+                } else {
+                    //若没有权限，提示获取.
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+                    Toast.makeText(MainActivity.this, "需要取得权限以使用悬浮窗", Toast.LENGTH_SHORT).show();
+                    startActivityForResult(intent, 0x0002);
+                }
+            } else {
+                //SDK在23以下，不用管.
+                Intent intent = new Intent(MainActivity.this, ForwardService.class);
+                startService(intent);
+            }
+        } else {
+            if (!Manufacturer.isSmartisan()){
+                // 锤子手机无法替换默认短信应用
+                showDialog();
+            } else {
+                mSMSContentObserver = new SMSContentObserver(mHandler, getApplicationContext());
+
+                getContentResolver().registerContentObserver(Uri.parse("content://sms/"), true, mSMSContentObserver);
+                //SDK在23以下，不用管.
+                Intent intent = new Intent(MainActivity.this, ForwardService.class);
+                startService(intent);
+            }
+        }
+
         Button button = findViewById(R.id.send_button);
+
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
 
+                Toast.makeText(MainActivity.this, "模拟推送", Toast.LENGTH_SHORT).show();
                 Log.d(TAG, "Start Push");
-                final String messageJson = "{\"data\":{\"aps\":{\"alert\":{\"body\":\"888888\",\"title\":\"+8615313726078\"}," +
-                        "\"badge\":\"Increment\",\"sms\":{\"address\":\"+8615313726078\",\"body\":\"888888\",\"date\":\"1543672750000\",\"id\":\"1064\",\"person\":\"\",\"protocol\":\"0\",\"read\":\"0\",\"simId\":\"-1\",\"type\":\"1\"},\"sound\":\"default\"}},\"prod\":\"dev\",\"where\":{\"deviceType\":\"ios\"}}";
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        OkHttpClient client = new OkHttpClient();
-
-                        MediaType mediaType = MediaType.parse("application/json");
-                        RequestBody body = RequestBody.create(mediaType, messageJson);
-                        Request request = new Request.Builder()
-                                .url("https://6g0ounut.push.lncld.net/1.1/push")
-                                .post(body)
-                                .addHeader("content-type", "application/json")
-                                .addHeader("x-lc-id", "6G0ouNUTlUdRYE2ARgwAhiJM-gzGzoHsz")
-                                .addHeader("x-lc-key", "nGciHu1gAOH8A93ja2i9OOVY,wL3ha2OcwKHbBMYTULnhp9bY")
-                                .build();
-
-                        try {
-                            Response response = client.newCall(request).execute();
-                            if (response.body() != null) {
-                                String result = response.body().string();
-                                Log.d(TAG, "Push: " + result);
-                                if (!TextUtils.isEmpty(result)) {
-                                    if (result.contains("objectId")) {
-                                        // success
-                                    }
-                                }
-                            }
-
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }).start();
+                TestSendPush.send(getApplicationContext());
 
             }
         });
+    }
 
-        mSMSContentObserver = new SMSContentObserver(mHandler, this.getApplicationContext());
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-
-            // Checks if the specified context can draw on top of other apps. As of API
-            // level 23, an app cannot draw on top of other apps unless it declares the
-            // {@link android.Manifest.permission#SYSTEM_ALERT_WINDOW} permission in its
-            // manifest, <em>and</em> the user specifically grants the app this
-            // capability. To prompt the user to grant this approval, the app must send an
-            // intent with the action
-            // {@link android.provider.Settings#ACTION_MANAGE_OVERLAY_PERMISSION}, which
-            // causes the system to display a permission management screen.
-            if (Settings.canDrawOverlays(MainActivity.this)) {
-                Toast.makeText(MainActivity.this, "已开启Toucher", Toast.LENGTH_SHORT).show();
-                Intent intent = new Intent(MainActivity.this, ForwardService.class);
-                startService(intent);
-                //finish();
-            } else {
-                //若没有权限，提示获取.
-                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
-                Toast.makeText(MainActivity.this, "需要取得权限以使用悬浮窗", Toast.LENGTH_SHORT).show();
+    private void showDialog(){
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("读取新短信");
+        builder.setMessage("为了防止\"有消息\"被杀掉，建议用此替换掉手机默认短信应用，如果选\"忽略\"，将使用数据库监听方式读取新短信");
+        builder.setPositiveButton("替换", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                isWantReplace = true;
+                Intent intent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT);
+                intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, getPackageName());
                 startActivity(intent);
             }
+        });
+        builder.setNegativeButton("忽律", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                mSMSContentObserver = new SMSContentObserver(mHandler, getApplicationContext());
 
-            List<String> failedPermissions = PermissionUtils.checkPermissions(this);
-            if (failedPermissions.isEmpty()){
-                // 所有的权限都获取到了
-                getContentResolver().registerContentObserver(Uri.parse("content://sms/"), true, mSMSContentObserver);
-            } else {
-                ActivityCompat.requestPermissions(this, PermissionUtils.sPermissions, 0x001);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    //检查有没有悬浮框的权限
+                    if (Settings.canDrawOverlays(MainActivity.this)) {
+                        //如果有权限直接开启悬浮框，目的是保活
+                        Toast.makeText(MainActivity.this, "已开启Toucher", Toast.LENGTH_SHORT).show();
+                        Intent intent = new Intent(MainActivity.this, ForwardService.class);
+                        startService(intent);
+
+                        List<String> failedPermissions = PermissionUtils.checkPermissions(getApplicationContext());
+                        if (!failedPermissions.isEmpty()){
+                            ActivityCompat.requestPermissions(MainActivity.this, PermissionUtils.sPermissions, 0x0001);
+                        } else {
+                            getContentResolver().registerContentObserver(Uri.parse("content://sms/"), true, mSMSContentObserver);
+                        }
+                    } else {
+                        //若没有权限，提示获取.
+                        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+                        Toast.makeText(MainActivity.this, "需要取得权限以使用悬浮窗", Toast.LENGTH_SHORT).show();
+                        startActivityForResult(intent, 0x0002);
+                    }
+                } else {
+                    //SDK在23以下，不用管.
+                    Intent intent = new Intent(MainActivity.this, ForwardService.class);
+                    startService(intent);
+                }
             }
-        } else {
-            getContentResolver().registerContentObserver(Uri.parse("content://sms/"), true, mSMSContentObserver);
-            //SDK在23以下，不用管.
-            Intent intent = new Intent(MainActivity.this, ForwardService.class);
-            startService(intent);
-            //finish();
+        });
+        builder.setCancelable(false);
+        builder.create().show();
+    }
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (isWantReplace){
+            // 点击替换，会再次弹出确认替换按钮，用户可能在这个时候，点击NO
+            // 再次让用户确认一种方式
+
+            if (!defaultSmsReplaced()){
+                // 用户点了NO
+                showDialog();
+                isWantReplace = false;
+            } else {
+                //用户点了 YES
+                // 短信应用已经被替换成 有消息，不需要监听数据库了
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    //检查有没有悬浮框的权限
+                    if (Settings.canDrawOverlays(MainActivity.this)) {
+                        //如果有权限直接开启悬浮框，目的是保活
+                        Toast.makeText(MainActivity.this, "已开启Toucher", Toast.LENGTH_SHORT).show();
+                        Intent intent = new Intent(MainActivity.this, ForwardService.class);
+                        startService(intent);
+
+                        List<String> failedPermissions = PermissionUtils.checkPermissions(this);
+                        if (!failedPermissions.isEmpty()){
+                            ActivityCompat.requestPermissions(this, PermissionUtils.sPermissions, 0x0001);
+                        }
+                    } else {
+                        //若没有权限，提示获取.
+                        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+                        Toast.makeText(MainActivity.this, "需要取得权限以使用悬浮窗", Toast.LENGTH_SHORT).show();
+                        startActivityForResult(intent, 0x0002);
+                    }
+                } else {
+                    //SDK在23以下，不用管.
+                    Intent intent = new Intent(MainActivity.this, ForwardService.class);
+                    startService(intent);
+                }
+            }
         }
     }
 
@@ -127,15 +182,36 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (requestCode == 0x001){
-            List<String> failed = PermissionUtils.checkPermissions(this, permissions, grantResults);
+        switch (requestCode){
+            case 0x0001:{
+                List<String> failed = PermissionUtils.checkPermissions(this, permissions, grantResults);
 
-            if (!failed.isEmpty()){
-                Toast.makeText(MainActivity.this, "权限不全", Toast.LENGTH_LONG).show();
-            } else {
-                getContentResolver().registerContentObserver(Uri.parse("content://sms/"), true, mSMSContentObserver);
+                if (!failed.isEmpty()){
+                    Toast.makeText(MainActivity.this, "权限不全", Toast.LENGTH_LONG).show();
+                } else {
+                    getContentResolver().registerContentObserver(Uri.parse("content://sms/"), true, mSMSContentObserver);
+                }
+                break;
+            }
+            case 0x0002:{
+                List<String> failedPermissions = PermissionUtils.checkPermissions(this);
+                if (failedPermissions.isEmpty()){
+                    // 所有的权限都获取到了
+                    getContentResolver().registerContentObserver(Uri.parse("content://sms/"), true, mSMSContentObserver);
+                } else {
+                    ActivityCompat.requestPermissions(this, PermissionUtils.sPermissions, 0x0001);
+                }
+
+                Toast.makeText(MainActivity.this, "已开启Toucher", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(MainActivity.this, ForwardService.class);
+                startService(intent);
+                break;
             }
         }
+    }
+
+    public boolean defaultSmsReplaced(){
+        return getPackageName().equals(Telephony.Sms.getDefaultSmsPackage(this));
     }
 
     private Handler mHandler = new Handler(Looper.myLooper()) {
@@ -147,18 +223,12 @@ public class MainActivity extends AppCompatActivity {
     };
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        Intent defIntent = new Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT);
-        defIntent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, this.getPackageName());
-        startActivity(defIntent);
-    }
-
-    @Override
     protected void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "onDestroy");
-        getContentResolver().unregisterContentObserver(mSMSContentObserver);
+        if (mSMSContentObserver != null) {
+            getContentResolver().unregisterContentObserver(mSMSContentObserver);
+        }
     }
 
 }
