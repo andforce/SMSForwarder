@@ -105,7 +105,7 @@ public class FloatView extends android.support.v7.widget.AppCompatImageButton {
 
                 params.x = (int) event.getRawX() - this.getWidth() / 2;
                 //这就是状态栏偏移量用的地方
-                params.y = (int) event.getRawY() - this.getHeight() / 2 - statusBarHeight;
+                params.y = (int) event.getRawY() - this.getHeight() - statusBarHeight;
                 windowManager.updateViewLayout(this, params);
                 x = moveX;
                 y = moveY;
